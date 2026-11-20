@@ -538,7 +538,7 @@ const FIREBASE_CONFIG = {
   bar.innerHTML='<span id="kapraCloudDot"></span><span id="kapraCloudText">Local data save ho raha hai</span><button id="kapraCloudLogin" type="button">ACCOUNT LOGIN</button><button id="kapraExportBtn" type="button">EXPORT</button><button id="kapraImportBtn" type="button">IMPORT</button><input id="kapraImportFile" type="file" accept="application/json,.json" hidden>';
   header.insertAdjacentElement('afterend',bar);
   document.getElementById('kapraCloudLogin').addEventListener('click',kapraShowAuth);
-  const auth=document.createElement('div');auth.id='kapraAuthBox';auth.innerHTML=`<div id="kapraAuthCard"><h3>🔐 KAPRA STORE LOGIN</h3><p style="font-size:12px">Pehle Email se account banayein / login karein. Phir isi account me mobile OTP link karein.</p><label>Email</label><input id="kapraEmail" type="email" autocomplete="email" placeholder="Aapka email"><label>Password</label><input id="kapraPassword" type="password" autocomplete="current-password" placeholder="Password"><button class="main" onclick="kapraEmailAuth('login')">EMAIL LOGIN</button><button class="soft" onclick="kapraEmailAuth('create')">NAYA EMAIL ACCOUNT</button><hr><label>Mobile number (+91 ke saath)</label><input id="kapraPhone" type="tel" placeholder="+91XXXXXXXXXX"><div id="kapraRecaptcha"></div><button class="main" onclick="kapraSendPhoneOtp()">MOBILE OTP LINK / LOGIN</button><label>OTP</label><input id="kapraOtp" inputmode="numeric" placeholder="SMS OTP"><button class="soft" onclick="kapraConfirmPhoneOtp()">OTP VERIFY</button><p id="kapraAuthMsg"></p><button class="soft" onclick="kapraCloseAuth()">CLOSE</button><button class="soft" onclick="kapraLogout()">LOGOUT</button></div>`;document.body.appendChild(auth);
+  const auth=document.createElement('div');auth.id='kapraAuthBox';auth.innerHTML=`<div id="kapraAuthCard"><h3>🔐 KAPRA STORE LOGIN</h3><p style="font-size:12px">Ek baar Email aur Password se login karein. Login browser me bana rahega; logout karne ki zarurat nahi.</p><label>Email</label><input id="kapraEmail" type="email" autocomplete="username" placeholder="Aapka email"><label>Password</label><input id="kapraPassword" type="password" autocomplete="current-password" placeholder="Kam-se-kam 6 character"><button class="main" onclick="kapraEmailAuth('login')">LOGIN</button><button class="soft" onclick="kapraEmailAuth('create')">NAYA ACCOUNT BANAYEIN</button><p style="font-size:11px;color:#555">Ek baar login hone ke baad browser me login yaad rahega, jab tak aap logout ya browser data clear nahi karte.</p><p id="kapraAuthMsg"></p><button class="soft" onclick="kapraCloseAuth()">CLOSE</button><button class="soft" onclick="kapraLogout()">LOGOUT</button></div>`;document.body.appendChild(auth);
   document.getElementById('kapraExportBtn').addEventListener('click',kapraExportJson);
   document.getElementById('kapraImportBtn').addEventListener('click',()=>document.getElementById('kapraImportFile').click());
   document.getElementById('kapraImportFile').addEventListener('change',kapraImportJson);
@@ -589,16 +589,27 @@ onPhoto=function(e,pid){const f=e.target.files&&e.target.files[0];if(!f)return;k
 setWallpaper=function(e){const f=e.target.files&&e.target.files[0];if(!f)return;kapraCompressFile(f).then(data=>{appSettings.wallpaper=data;applySettings();alert('Wallpaper save ho gaya ✅');}).catch(()=>alert('Wallpaper photo save nahi hui.'));};
 saveBankScannerImage=function(bank,event){const f=event&&event.target&&event.target.files&&event.target.files[0];if(!f)return;if(!f.type.startsWith('image/')){alert('Sirf image select karein');return;}kapraCompressFile(f).then(data=>{localStorage.setItem(bank==='bankA'?BANK_A_SCANNER_KEY:BANK_B_SCANNER_KEY,data);refreshBankScannerPreviews();alert((bank==='bankA'?'BANK A':'BANK B')+' scanner photo save ho gayi.');}).catch(()=>alert('Scanner photo save nahi hui.'));};
 
-// 6) Firebase Email/Password + Phone OTP authentication. Phone is linked to the same email account.
+// 6) Firebase Email/Password authentication with persistent browser login.
 function kapraConfigReady(){return FIREBASE_CONFIG.apiKey&&FIREBASE_CONFIG.projectId&&FIREBASE_CONFIG.appId&&!String(FIREBASE_CONFIG.apiKey).includes('PASTE_')&&!String(FIREBASE_CONFIG.projectId).includes('PASTE_');}
-let kapraPhoneConfirmation=null,kapraRecaptcha=null;
 function kapraAuthMessage(m){const e=document.getElementById('kapraAuthMsg');if(e)e.textContent=m;}
-function kapraShowAuth(){if(!kapraConfigReady()){alert('Firebase Web App config abhi code me bharna baaki hai.');return;}document.getElementById('kapraAuthBox').style.display='flex';kapraAuthMessage(kapraUser?'Account connected: '+(kapraUser.email||kapraUser.phoneNumber||'Firebase user'):'Email se pehle login/create karein.');}
+function kapraShowAuth(){if(!kapraConfigReady()){alert('Firebase Web App config abhi code me bharna baaki hai.');return;}document.getElementById('kapraAuthBox').style.display='flex';kapraAuthMessage(kapraUser?'Account connected: '+(kapraUser.email||'Firebase user'):'Email aur Password se login karein.');}
 function kapraCloseAuth(){const e=document.getElementById('kapraAuthBox');if(e)e.style.display='none';}
-async function kapraEmailAuth(mode){try{if(!firebase.apps.length)firebase.initializeApp(FIREBASE_CONFIG);const email=document.getElementById('kapraEmail').value.trim(),password=document.getElementById('kapraPassword').value;if(!email||password.length<6)throw new Error('Sahi email aur kam-se-kam 6 character password bharein.');if(mode==='create')await firebase.auth().createUserWithEmailAndPassword(email,password);else await firebase.auth().signInWithEmailAndPassword(email,password);kapraAuthMessage('Email account connected. Ab isi account me mobile number OTP se link karein.');}catch(e){kapraAuthMessage(e.message||'Email login nahi hua.');}}
-function kapraGetRecaptcha(){if(kapraRecaptcha){try{kapraRecaptcha.clear();}catch(e){}}kapraRecaptcha=new firebase.auth.RecaptchaVerifier('kapraRecaptcha',{size:'normal'});return kapraRecaptcha;}
-async function kapraSendPhoneOtp(){try{if(!kapraUser)throw new Error('Pehle Email se login karein. Isse phone aur email ek hi account me judenge.');const phone=document.getElementById('kapraPhone').value.trim();if(!/^\+[1-9]\d{7,14}$/.test(phone))throw new Error('Mobile number country code ke saath likhein, jaise +91XXXXXXXXXX.');const verifier=kapraGetRecaptcha();kapraPhoneConfirmation=await kapraUser.linkWithPhoneNumber(phone,verifier);kapraAuthMessage('OTP bhej diya gaya. SMS ka code daalein.');}catch(e){kapraAuthMessage(e.code==='auth/credential-already-in-use'?'Ye mobile number kisi doosre Firebase account se juda hai. Support ke bina link na karein.':(e.message||'OTP nahi bheja gaya.'));}}
-async function kapraConfirmPhoneOtp(){try{if(!kapraPhoneConfirmation)throw new Error('Pehle MOBILE OTP LINK dabayein.');const code=document.getElementById('kapraOtp').value.trim();if(!code)throw new Error('SMS OTP bharein.');await kapraPhoneConfirmation.confirm(code);kapraPhoneConfirmation=null;kapraAuthMessage('Mobile number isi Email account se link ho gaya.');}catch(e){kapraAuthMessage(e.message||'OTP verify nahi hua.');}}
+async function kapraEmailAuth(mode){
+  try{
+    if(!firebase.apps.length)firebase.initializeApp(FIREBASE_CONFIG);
+    const auth=firebase.auth();
+    await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+    const email=document.getElementById('kapraEmail').value.trim();
+    const password=document.getElementById('kapraPassword').value;
+    if(!email||password.length<6)throw new Error('Sahi email aur kam-se-kam 6 character password bharein.');
+    if(mode==='create')await auth.createUserWithEmailAndPassword(email,password);
+    else await auth.signInWithEmailAndPassword(email,password);
+    kapraAuthMessage('Login ho gaya! Aapka account is browser me yaad rahega.');
+  }catch(e){
+    const messages={'auth/api-key-not-valid':'Firebase API Key galat ya restricted hai. Firebase/Google Cloud me API key check karein.','auth/operation-not-allowed':'Firebase Authentication me Email/Password provider Enable karein.','auth/invalid-email':'Email address sahi nahi hai.','auth/user-not-found':'Account nahi mila. Pehle NAYA ACCOUNT BANAYEIN.','auth/wrong-password':'Password galat hai.','auth/email-already-in-use':'Is email ka account pehle se hai. LOGIN karein.','auth/weak-password':'Password kam-se-kam 6 character ka rakhein.'};
+    kapraAuthMessage(messages[e.code]||e.message||'Login nahi hua.');
+  }
+}
 async function kapraLogout(){try{await firebase.auth().signOut();kapraCloseAuth();}catch(e){kapraAuthMessage(e.message);}}
 function kapraHash(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return (h>>>0).toString(16);}
 async function kapraUploadPhotos(value,pathBase){
@@ -682,7 +693,7 @@ exportData=kapraExportJson;
     firebase.auth().onAuthStateChanged(async user=>{
       kapraUser=user;
       const loginBtn=document.getElementById('kapraCloudLogin');if(loginBtn)loginBtn.textContent=user?'ACCOUNT CONNECTED':'ACCOUNT LOGIN';
-      if(!user){kapraStatus('yellow','Local save active • Email/Phone account login karein');return;}
+      if(!user){kapraStatus('yellow','Local save active • Email login karein');return;}
       try{kapraStatus('yellow','Firebase se data check ho raha hai');await kapraCloudPullAndMerge();}
       catch(e){console.error(e);kapraStatus('yellow','Sync Pending • '+(e.code||'Connection issue'));}
     });
